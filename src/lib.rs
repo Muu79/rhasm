@@ -7,11 +7,29 @@ pub mod file_parser {
 
     use crate::encoder;
 
+    const INSTRUCTION_REGEX: &str =
+        r"(?x)
+^
+(?:
+    @(?P<a_symbol>[a-zA-Z_\.\$:][\w\.\$:]*|\d+) # A-instruction (address or symbol)
+  |
+    \((?P<l_label>[a-zA-Z_\.\$:][\w\.\$:]+)\)   # L-instruction (label)
+  |
+    (?:
+        (?P<c_dest>[ADM]{1,3})?  # Optional dest part for C-instruction
+        =?
+        (?P<c_comp>[AMD01!+\-&|]+) # Required comp part for C-instruction
+        ;?
+        (?P<c_jump>[A-Z]{3})?   # Optional jump part for C-instruction
+    )
+)
+$
+";
+
     #[derive(Clone, Debug, PartialEq)]
     pub enum Instruction {
-        AInstructionUnresolved(String),
-        AInstruction(u16),
-        CInstruction(String),
+        AInstruction(String),
+        CInstruction(String, String, String),
     }
 
     pub struct Assembler<'a> {
@@ -24,6 +42,7 @@ pub mod file_parser {
         out_file: BufWriter<File>,
         pub instructions: Vec<Instruction>,
         fp_flag: bool,
+        instruction_regex: Regex,
     }
 
     impl Assembler<'_> {
@@ -42,6 +61,7 @@ pub mod file_parser {
                 out_file,
                 instructions: Vec::new(),
                 fp_flag: false,
+                instruction_regex: Regex::new(INSTRUCTION_REGEX).unwrap(),
             };
             assembler.init();
             assembler
@@ -85,62 +105,38 @@ pub mod file_parser {
             // We only parse when has_more_commands() is true so we can unwrap safely
             let line = self.lines.next().unwrap().unwrap();
             // Remove comments and trim whitespace
-            let line = line.split("//").next().unwrap().trim();
+            let line = line.split("//").next().unwrap().trim().to_owned();
+            if line.is_empty() {
+                return;
+            }
 
-            if !line.is_empty() {
-                // Handle Address Instructions
-                if line.starts_with("@") {
-                    let expr = Regex::new(r"(?:@)(\S+)").unwrap();
-
-                    let addr: String;
-
-                    if let Some(cap) = expr.captures(line) {
-                        if let Some(matched) = cap.get(1) {
-                            addr = matched.as_str().to_string();
-                        } else {
-                            panic!(
-                                "Invalid A-Instruction address at line: {} {}",
-                                self.cur_line,
-                                line
-                            );
-                        }
-                    } else {
-                        panic!("Invalid A-Instruction address at line: {} {}", self.cur_line, line);
-                    }
-                    let num_address = addr.parse::<u16>();
-                    match num_address {
-                        Ok(addr) => {
-                            self.instructions.push(Instruction::AInstruction(addr));
-                        }
-                        Err(_) => {
-                            self.instructions.push(Instruction::AInstructionUnresolved(addr));
-                        }
-                    }
-                } else if
-                    // Handle Label Pseudo Instructions
-                    // We don't actually need a label-instruction Enum,
-                    // We just need to make sure it's symbol is in the symbol table
-                    line.starts_with("(")
-                {
-                    let expr: Regex = Regex::new(r"\((\S+)\)").unwrap();
-                    let symbol: String;
-                    // This complex statement uses the regex to extract the symbol from the line
-                    // It does this through "if let" pattern matching which is somewhat confusing
-                    // It's simply a shorthand since we need to unwrap multiple times
-                    if let Some(capture) = expr.captures(line) {
-                        if let Some(matched) = capture.get(1) {
-                            symbol = matched.as_str().to_string();
-                            self.symbol_table.insert(
-                                symbol.clone(),
-                                // We use the current instruction count as the address of the label
-                                self.instructions.len().try_into().unwrap()
-                            );
-                        }
-                    }
+            let captures = self.instruction_regex.captures(&line);
+            if let Some(captures) = captures {
+                if let Some(a_symbol) = captures.name("a_symbol") {
+                    let addr = a_symbol.as_str();
+                    self.instructions.push(Instruction::AInstruction(addr.to_string()));
+                } else if let Some(c_comp) = captures.name("c_comp") {
+                    let c_comp = c_comp.as_str();
+                    let c_dest = captures.name("c_dest").map_or("", |m| m.as_str());
+                    let c_jump = captures.name("c_jump").map_or("", |m| m.as_str());
+                    self.instructions.push(
+                        Instruction::CInstruction(
+                            c_dest.to_string(),
+                            c_comp.to_string(),
+                            c_jump.to_string()
+                        )
+                    );
+                } else if let Some(l_label) = captures.name("l_label") {
+                    let label = l_label.as_str();
+                    self.symbol_table.insert(
+                        label.to_string(),
+                        self.instructions.len().try_into().unwrap()
+                    );
                 } else {
-                    // Finally, handle Compute Instructions
-                    self.instructions.push(Instruction::CInstruction(line.to_owned()));
+                    panic!("Invalid Instruction @ line [{}]: {}", self.cur_line, line);
                 }
+            } else {
+                panic!("Invalid Instruction @ line [{}]: {}", self.cur_line, line);
             }
         }
 
@@ -195,18 +191,8 @@ pub mod file_parser {
                 &mut self.cur_ram
             );
             self.cur_instruction += 1;
-            if out.len() != 16 {
-                match self.instructions.get((self.cur_instruction as usize) - 1).unwrap() {
-                    Instruction::AInstructionUnresolved(symbol) => {
-                        panic!("Unresolved Symbol: {}", symbol);
-                    }
-                    _ => {
-                        panic!(
-                            "Invalid Instruction: {:?}",
-                            self.instructions.get((self.cur_instruction as usize) - 1).unwrap()
-                        );
-                    }
-                }
+            if self.cur_instruction % 100 == 0 {
+                println!("Encoded {} instructions", self.cur_instruction);
             }
             out
         }
@@ -219,12 +205,9 @@ pub mod file_parser {
 
 pub mod encoder {
     use std::collections::HashMap;
-    use regex::Regex;
     use crate::file_parser::Instruction;
 
-    const COMP_REGEX: &str =
-        r"(?:(?P<dest>(?:A?M?D?)|(?:A?D?M?)|(?:D?A?M?)|(?:D?M?A?)|(?:M?A?D?)|(?:M?D?A?))=)?(?P<comp>[01\-ADM!+&|]+)(?:;(?P<jmp>[a-zA-Z]+))?";
-    pub fn encode_instruction(
+     pub fn encode_instruction(
         instruction: &Instruction,
         symbol_table: &mut HashMap<String, u16>,
         cur_ram: &mut u16
@@ -233,56 +216,28 @@ pub mod encoder {
         match instruction {
             Instruction::AInstruction(addr) => {
                 encoded_instruction.push('0');
+                let addr = if addr.chars().all(|char| char.is_digit(10)) {
+                    let is_num = addr.parse::<u16>();
+                    if let Ok(num) = is_num {
+                        num
+                    } else {
+                        panic!("Invalid A-Instruction address or label: {}", addr);
+                    }
+                } else {
+                    if !symbol_table.contains_key(&addr.to_string()) {
+                        symbol_table.insert(addr.to_string(), *cur_ram);
+                        *cur_ram += 1;
+                    }
+                    *symbol_table.get(&addr.to_string()).unwrap()
+                };
                 let binary_addr = format!("{:015b}", addr);
                 encoded_instruction.extend(binary_addr.chars());
             }
-            Instruction::AInstructionUnresolved(symbol) => {
-                let addr = symbol_table.get(symbol);
-                encoded_instruction.push('0');
-                match addr {
-                    Some(addr) => {
-                        let binary_addr = format!("{:015b}", addr);
-                        encoded_instruction.extend(binary_addr.chars());
-                    }
-                    None => {
-                        symbol_table.insert(symbol.clone(), *cur_ram);
-                        let binary_addr = format!("{:015b}", cur_ram);
-                        encoded_instruction.extend(binary_addr.chars());
-                        *cur_ram += 1;
-                    }
-                }
-            }
-            Instruction::CInstruction(c_inst_str) => {
-                let expression = Regex::new(COMP_REGEX).unwrap();
+            Instruction::CInstruction(dest_str, comp_str, jump_string) => {
                 encoded_instruction.extend("111".chars());
-                if let Some(captures) = expression.captures(&c_inst_str) {
-
-                    let comp_str = captures.name("comp");
-                    if let Some(comp_str) = comp_str {
-                        let comp_str = comp_str.as_str();
-                        encoded_instruction.extend(comp(&comp_str).chars());
-                    } else {
-                        panic!("Invalid C-Instruction: {}", c_inst_str);
-                    }
-
-                    let dest_str = captures.name("dest");
-                    if let Some(dest_str) = dest_str {
-                        let dest_str = dest_str.as_str();
-                        encoded_instruction.extend(dest(&dest_str).chars());
-                    }else{
-                        encoded_instruction.extend("000".chars());
-                    }
-
-                    let jump_str = captures.name("jmp");
-                    if let Some(jump_str) = jump_str {
-                        let jump_str = jump_str.as_str();
-                        encoded_instruction.extend(jump(&jump_str).chars());
-                    }else{
-                        encoded_instruction.extend("000".chars());
-                    }
-                } else {
-                    panic!("Invalid C-Instruction: {}", c_inst_str);
-                }
+                encoded_instruction.extend(comp(comp_str).chars());
+                encoded_instruction.extend(dest(dest_str).chars());
+                encoded_instruction.extend(jump(jump_string).chars());
             }
         }
         return encoded_instruction.iter().collect();
