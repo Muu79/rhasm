@@ -172,8 +172,7 @@ pub mod file_parser {
             self.symbol_table.insert("KBD".to_string(), 24576);
         }
 
-       
-        pub fn advance_once(&mut self)  {
+        pub fn advance_once(&mut self) {
             let encoded_instruction = self.get_next_encoded_instruction();
             self.write_line(encoded_instruction);
         }
@@ -190,20 +189,22 @@ pub mod file_parser {
         }
 
         pub fn get_next_encoded_instruction(&mut self) -> String {
-
             let out = encoder::encode_instruction(
                 self.instructions.get(self.cur_instruction as usize).unwrap(),
                 &mut self.symbol_table,
-                &mut self.cur_ram,
+                &mut self.cur_ram
             );
             self.cur_instruction += 1;
             if out.len() != 16 {
-                match self.instructions.get(self.cur_instruction as usize - 1).unwrap() {
+                match self.instructions.get((self.cur_instruction as usize) - 1).unwrap() {
                     Instruction::AInstructionUnresolved(symbol) => {
                         panic!("Unresolved Symbol: {}", symbol);
                     }
                     _ => {
-                        panic!("Invalid Instruction: {:?}", self.instructions.get(self.cur_instruction as usize - 1).unwrap());
+                        panic!(
+                            "Invalid Instruction: {:?}",
+                            self.instructions.get((self.cur_instruction as usize) - 1).unwrap()
+                        );
                     }
                 }
             }
@@ -218,13 +219,15 @@ pub mod file_parser {
 
 pub mod encoder {
     use std::collections::HashMap;
-
+    use regex::Regex;
     use crate::file_parser::Instruction;
 
+    const COMP_REGEX: &str =
+        r"(?:(?P<dest>(?:A?M?D?)|(?:A?D?M?)|(?:D?A?M?)|(?:D?M?A?)|(?:M?A?D?)|(?:M?D?A?))=)?(?P<comp>[01\-ADM!+&|]+)(?:;(?P<jmp>[a-zA-Z]+))?";
     pub fn encode_instruction(
         instruction: &Instruction,
         symbol_table: &mut HashMap<String, u16>,
-        cur_ram: &mut u16,
+        cur_ram: &mut u16
     ) -> String {
         let mut encoded_instruction: Vec<char> = vec![];
         match instruction {
@@ -250,30 +253,36 @@ pub mod encoder {
                 }
             }
             Instruction::CInstruction(c_inst_str) => {
+                let expression = Regex::new(COMP_REGEX).unwrap();
                 encoded_instruction.extend("111".chars());
-                let comp_str: String;
-                let dest_str: String;
-                let jump_str: String;
-                if c_inst_str.contains("=") && c_inst_str.contains(";") {
-                    let parts: Vec<&str> = c_inst_str.split("=").collect();
-                    let parts2: Vec<&str> = parts[1].split(";").collect();
-                    dest_str = parts[0].to_string();
-                    comp_str = parts2[0].to_string();
-                    jump_str = parts2[1].to_string();
-                } else if c_inst_str.contains("=") {
-                    let parts: Vec<&str> = c_inst_str.split("=").collect();
-                    dest_str = parts[0].to_string();
-                    comp_str = parts[1].to_string();
-                    jump_str = "".to_string();
+                if let Some(captures) = expression.captures(&c_inst_str) {
+
+                    let comp_str = captures.name("comp");
+                    if let Some(comp_str) = comp_str {
+                        let comp_str = comp_str.as_str();
+                        encoded_instruction.extend(comp(&comp_str).chars());
+                    } else {
+                        panic!("Invalid C-Instruction: {}", c_inst_str);
+                    }
+
+                    let dest_str = captures.name("dest");
+                    if let Some(dest_str) = dest_str {
+                        let dest_str = dest_str.as_str();
+                        encoded_instruction.extend(dest(&dest_str).chars());
+                    }else{
+                        encoded_instruction.extend("000".chars());
+                    }
+
+                    let jump_str = captures.name("jmp");
+                    if let Some(jump_str) = jump_str {
+                        let jump_str = jump_str.as_str();
+                        encoded_instruction.extend(jump(&jump_str).chars());
+                    }else{
+                        encoded_instruction.extend("000".chars());
+                    }
                 } else {
-                    let parts: Vec<&str> = c_inst_str.split(";").collect();
-                    dest_str = "".to_string();
-                    comp_str = parts[0].to_string();
-                    jump_str = parts[1].to_string();
+                    panic!("Invalid C-Instruction: {}", c_inst_str);
                 }
-                encoded_instruction.extend(comp(&comp_str).chars());
-                encoded_instruction.extend(dest(&dest_str).chars());
-                encoded_instruction.extend(jump(&jump_str).chars());
             }
         }
         return encoded_instruction.iter().collect();
@@ -304,7 +313,10 @@ pub mod encoder {
             "JNE" => "101",
             "JLE" => "110",
             "JMP" => "111",
-            _ => "000",
+            "" => "000",
+            _ => {
+                panic!("Invalid Jump Mnemonic: {}", mnemonic);
+            }
         };
         out.to_string()
     }
@@ -339,7 +351,9 @@ pub mod encoder {
             "M-D" => "1000111",
             "D&M" => "1000000",
             "D|M" => "1010101",
-            _ => "0000000",
+            _ => {
+                panic!("Invalid Computation Mnemonic: {}", mnemonic);
+            }
         };
         out.to_string()
     }
