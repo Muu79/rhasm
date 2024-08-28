@@ -7,8 +7,8 @@ pub mod file_parser {
 
     use crate::encoder;
 
-    const INSTRUCTION_REGEX: &str =
-        r"(?x)
+    const INSTRUCTION_REGEX: &str ={
+        r"(?x) # Ignore whitespace and allow comments
 ^
 (?:
     @(?P<a_symbol>[a-zA-Z_\.\$:][\w\.\$:]*|\d+) # A-instruction (address or symbol)
@@ -24,7 +24,7 @@ pub mod file_parser {
     )
 )
 $
-";
+"};
 
     #[derive(Clone, Debug, PartialEq)]
     pub enum Instruction {
@@ -46,6 +46,9 @@ $
     }
 
     impl Assembler<'_> {
+        // We take in a filename and an output file name
+        // May change to take in a BufReader and BufWriter instead
+        // Or use generics to allow for any type that implements Read and Write
         pub fn new<'a>(filename: &'a str, out_file: &'a str) -> Assembler<'a> {
             let file: File = File::open(filename).unwrap_or(File::open("default.asm").unwrap());
             let out_file = BufWriter::new(File::create(out_file).unwrap());
@@ -66,6 +69,7 @@ $
             assembler.init();
             assembler
         }
+
 
         // Function to initialize the assembler and its symbol table
         // Called by constructor to ensure symbol table is populated
@@ -191,7 +195,7 @@ $
                 &mut self.cur_ram
             );
             self.cur_instruction += 1;
-            if self.cur_instruction % 100 == 0 {
+            if self.cur_instruction % ((self.instructions.len()/10) as u16) == 0 {
                 println!("Encoded {} instructions", self.cur_instruction);
             }
             out
