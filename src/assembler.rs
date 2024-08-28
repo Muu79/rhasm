@@ -10,10 +10,10 @@ use std::io::{ BufRead, BufReader, BufWriter, Lines, Write };
 
 use std::iter::Peekable;
 
-pub(crate) const INSTRUCTION_REGEX: &str = {
-    r"(?x) # Ignore whitespace and allow comments
-^
-(?:
+
+pub(crate) const INSTRUCTION_REGEX: &str = {r"
+(?x) # Ignore whitespace and allow comments
+^(?:
     @(?P<a_symbol>[a-zA-Z_\.\$:][\w\.\$:]*|\d+) # A-instruction (address or symbol)
   |
     \((?P<l_label>[a-zA-Z_\.\$:][\w\.\$:]+)\)   # L-instruction (label)
@@ -25,9 +25,7 @@ pub(crate) const INSTRUCTION_REGEX: &str = {
         ;?
         (?P<c_jump>[A-Z]{3})?   # Optional jump part for C-instruction
     )
-)
-$
-"
+)$"
 };
 
 #[derive(Clone, Debug, PartialEq)]
@@ -36,37 +34,66 @@ pub enum Instruction {
     CInstruction(String, String, String),
 }
 
-pub struct Assembler<'a> {
-    pub filename: &'a str,
+pub struct Assembler {
+    pub(crate) out_file: BufWriter<File>,
     pub(crate) lines: Peekable<Lines<BufReader<File>>>,
     pub(crate) cur_ram: u16,
     pub(crate) cur_line: usize,
     pub(crate) cur_instruction: u16,
     pub symbol_table: HashMap<String, u16>,
-    pub(crate) out_file: BufWriter<File>,
     pub instructions: Vec<Instruction>,
     pub(crate) fp_flag: bool,
     pub(crate) instruction_regex: Regex,
 }
 
-impl Assembler<'_> {
+impl Assembler {
     // We take in a filename and an output file name
     // May change to take in a BufReader and BufWriter instead
     // Or use generics to allow for any type that implements Read and Write
-    pub fn new<'a>(filename: &'a str, out_file: &'a str) -> Assembler<'a> {
-        let file: File = File::open(filename).unwrap_or(File::open("default.asm").unwrap());
-        let out_file = BufWriter::new(File::create(out_file).unwrap());
-        let lines: Peekable<Lines<BufReader<File>>> = BufReader::new(file).lines().peekable();
+    pub fn new(in_file: Option<File>, out_file: Option<File>) -> Assembler {
+        // We either accept a file passed in or open the default file
+        // If None is passed in, we open the sample file
+        // Our file reference is then wrapped in a BufReader
+        let in_file: BufReader<File> = BufReader::new(
+            if let Some(file) = in_file {
+                file
+            } else {
+                // If we can't open the file, we panic
+                match File::open("sample.asm") {
+                    Ok(file) => file,
+                    Err(e) => panic!("Error opening file: {}", e),
+                }
+            }
+        );
+
+        // We either accept a file passed in or create the default file
+        // If None is passed in, we create the sample file
+        // Our file reference is then wrapped in a BufWriter
+        let out_file:BufWriter<File>  = BufWriter::new(
+            if let Some(file) = out_file {
+                file
+            } else {
+                match File::create("sample.hack") {
+                    Ok(file) => file,
+                    Err(e) => panic!("Error creating file: {}", e),
+                }
+            }
+        );
+
+        // We get a peekable iterator of lines from our BufReader
+        let lines: Peekable<Lines<BufReader<File>>> = in_file.lines().peekable();
+
+        // We initialize our symbol table as an empty HashMap
+        // (Maybe we should use &str instead?)
         let symbol_table: HashMap<String, u16> = HashMap::new();
         let mut assembler = Assembler {
-            filename,
+            out_file,
             lines,
-            cur_ram: 16,
+            cur_ram: 16, /*Starting address for variables*/
             cur_line: 0,
             cur_instruction: 0,
             symbol_table,
-            out_file,
-            instructions: Vec::new(),
+            instructions: Vec::<Instruction>::new(),
             fp_flag: false,
             instruction_regex: Regex::new(INSTRUCTION_REGEX).unwrap(),
         };
