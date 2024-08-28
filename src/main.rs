@@ -1,5 +1,8 @@
+pub mod assembler;
+pub mod encoder;
 use std::{env, io};
-use rhasm::file_parser::Assembler;
+use assembler::Assembler;
+
 fn main() -> io::Result<()>{
     let args: Vec<String> = env::args().collect();
     let filename: &str = match args.get(1){
