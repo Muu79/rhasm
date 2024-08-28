@@ -3,6 +3,7 @@ pub mod encoder;
 use std::{ env, io };
 use assembler::Assembler;
 
+
 fn main() -> io::Result<()> {
     let args = env::args().collect::<Vec<String>>();
     let in_file: &str = match args.get(1) {

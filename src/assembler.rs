@@ -1,3 +1,5 @@
+use lazy_static::lazy_static;
+
 use crate::encoder;
 
 use regex::Regex;
@@ -10,23 +12,24 @@ use std::io::{ BufRead, BufReader, BufWriter, Lines, Write };
 
 use std::iter::Peekable;
 
-
-pub(crate) const INSTRUCTION_REGEX: &str = {r"
-(?x) # Ignore whitespace and allow comments
-^(?:
-    @(?P<a_symbol>[a-zA-Z_\.\$:][\w\.\$:]*|\d+) # A-instruction (address or symbol)
-  |
-    \((?P<l_label>[a-zA-Z_\.\$:][\w\.\$:]+)\)   # L-instruction (label)
-  |
-    (?:
-        (?P<c_dest>[ADM]{1,3})?  # Optional dest part for C-instruction
-        =?
-        (?P<c_comp>[AMD01!+\-&|]+) # Required comp part for C-instruction
-        ;?
-        (?P<c_jump>[A-Z]{3})?   # Optional jump part for C-instruction
-    )
-)$"
-};
+lazy_static! {
+    static ref INSTRUCTION_REGEX: Regex = Regex::new({
+r"(?x) # Ignore whitespace and allow comments
+    ^(?:
+        @(?P<a_symbol>[a-zA-Z_\.\$:][\w\.\$:]*|\d+) # A-instruction (address or symbol)
+      |
+        \((?P<l_label>[a-zA-Z_\.\$:][\w\.\$:]+)\)   # L-instruction (label)
+      |
+        (?:
+            (?P<c_dest>[ADM]{1,3})?  # Optional dest part for C-instruction
+            =?
+            (?P<c_comp>[AMD01!+\-&|]+) # Required comp part for C-instruction
+            ;?
+            (?P<c_jump>[A-Z]{3})?   # Optional jump part for C-instruction
+        )
+    )$"
+    }).unwrap();
+}
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Instruction {
@@ -43,14 +46,14 @@ pub struct Assembler {
     pub symbol_table: HashMap<String, u16>,
     pub instructions: Vec<Instruction>,
     pub(crate) fp_flag: bool,
-    pub(crate) instruction_regex: Regex,
+    pub(crate) instruction_regex: &'static Regex,
 }
 
 impl Assembler {
     // We take in a filename and an output file name
     // May change to take in a BufReader and BufWriter instead
     // Or use generics to allow for any type that implements Read and Write
-    pub fn new(in_file: Option<File>, out_file: Option<File>) -> Assembler {
+    pub fn new<'a>(in_file: Option<File>, out_file: Option<File>) -> Assembler {
         // We either accept a file passed in or open the default file
         // If None is passed in, we open the sample file
         // Our file reference is then wrapped in a BufReader
@@ -69,7 +72,7 @@ impl Assembler {
         // We either accept a file passed in or create the default file
         // If None is passed in, we create the sample file
         // Our file reference is then wrapped in a BufWriter
-        let out_file:BufWriter<File>  = BufWriter::new(
+        let out_file: BufWriter<File> = BufWriter::new(
             if let Some(file) = out_file {
                 file
             } else {
@@ -89,13 +92,13 @@ impl Assembler {
         let mut assembler = Assembler {
             out_file,
             lines,
-            cur_ram: 16, /*Starting address for variables*/
+            cur_ram: 16 /*Starting address for variables*/,
             cur_line: 0,
             cur_instruction: 0,
             symbol_table,
             instructions: Vec::<Instruction>::new(),
             fp_flag: false,
-            instruction_regex: Regex::new(INSTRUCTION_REGEX).unwrap(),
+            instruction_regex: &INSTRUCTION_REGEX,
         };
         assembler.init();
         assembler
