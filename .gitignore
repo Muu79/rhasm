@@ -1,4 +1,4 @@
 /target
 *.svg
 perf.*
-default.hack
+*.hack
