@@ -1,1 +1,1 @@
-*.asm -linguist-vendored
+sample.asm -linguist-detectable=false
