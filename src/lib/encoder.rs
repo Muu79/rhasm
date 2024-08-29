@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use crate::assembler::Instruction;
+use crate::Instruction;
 
 pub fn encode_instruction(
     instruction: &Instruction,
@@ -29,15 +29,15 @@ pub fn encode_instruction(
         }
         Instruction::CInstruction(dest_str, comp_str, jump_string) => {
             encoded_instruction.extend("111".chars());
-            encoded_instruction.extend(comp(comp_str).chars());
-            encoded_instruction.extend(dest(dest_str).chars());
-            encoded_instruction.extend(jump(jump_string).chars());
+            encoded_instruction.extend(get_comp_code(comp_str).chars());
+            encoded_instruction.extend(get_dest_code(dest_str).chars());
+            encoded_instruction.extend(get_jump_code(jump_string).chars());
         }
     }
     return encoded_instruction.iter().collect();
 }
 
-fn dest(mnemonic: &str) -> String {
+fn get_dest_code(mnemonic: &str) -> String {
     let mut dest: [u8; 3] = [0; 3];
     if mnemonic.contains("A") {
         dest[0] = 1;
@@ -53,7 +53,7 @@ fn dest(mnemonic: &str) -> String {
         .collect()
 }
 
-fn jump(mnemonic: &str) -> String {
+fn get_jump_code(mnemonic: &str) -> String {
     let out = match mnemonic {
         "JGT" => "001",
         "JEQ" => "010",
@@ -70,7 +70,7 @@ fn jump(mnemonic: &str) -> String {
     out.to_string()
 }
 
-fn comp(mnemonic: &str) -> String {
+fn get_comp_code(mnemonic: &str) -> String {
     let out = match mnemonic {
         "0" => "0101010",
         "1" => "0111111",

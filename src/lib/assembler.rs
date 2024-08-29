@@ -1,15 +1,9 @@
 use lazy_static::lazy_static;
-
-use crate::encoder;
-
+use crate::lib::encoder;
 use regex::Regex;
-
 use std::collections::HashMap;
-
 use std::fs::File;
-
 use std::io::{ BufRead, BufReader, BufWriter, Lines, Write };
-
 use std::iter::Peekable;
 
 lazy_static! {
@@ -106,7 +100,7 @@ impl Assembler {
 
     // Function to initialize the assembler and its symbol table
     // Called by constructor to ensure symbol table is populated
-    pub(crate) fn init(&mut self) {
+    fn init(&mut self) {
         if !self.fp_flag {
             self.first_pass();
             println!("First Pass Completed!");
@@ -117,7 +111,7 @@ impl Assembler {
 
     // Function to check if there are more commands to read
     // Uses the Peekable iterator to safe-check if there are more lines
-    pub fn can_read_more_instructions(&mut self) -> bool {
+    fn can_read_more_instructions(&mut self) -> bool {
         // only returns none on EOF not on empty lines
         self.lines.peek().is_some()
     }
@@ -125,7 +119,7 @@ impl Assembler {
     // Function to run the first pass of the assembler
     // Populates the symbol table with default symbols
     // Additionally parses through the source file and creates a vector of Instructions
-    pub(crate) fn first_pass(&mut self) {
+    fn first_pass(&mut self) {
         self.populate_default_symbols();
         println!("Generated Default Symbol Table!");
         while self.can_read_more_instructions() {
@@ -138,7 +132,7 @@ impl Assembler {
     // Function dedicated to parsing through our source file and creating a vector of Instructions
     // This allows for address labels to be resolved in the second pass
     // As well as us extracting the instructions from the file into enums
-    pub(crate) fn parse_instruction(&mut self) {
+    fn parse_instruction(&mut self) {
         // We only parse when has_more_commands() is true so we can unwrap safely
         let line = self.lines.next().unwrap().unwrap();
         // Remove comments and trim whitespace
@@ -179,7 +173,7 @@ impl Assembler {
 
     // Subroutine to populate the default symbols
     // Symbol names as per the Hack Assembly Language Specification
-    pub(crate) fn populate_default_symbols(&mut self) {
+    fn populate_default_symbols(&mut self) {
         self.symbol_table.insert("SP".to_string(), 0);
         self.symbol_table.insert("LCL".to_string(), 1);
         self.symbol_table.insert("ARG".to_string(), 2);
@@ -234,7 +228,7 @@ impl Assembler {
         out
     }
 
-    pub(crate) fn write_line(&mut self, encoded: String) {
+    fn write_line(&mut self, encoded: String) {
         writeln!(self.out_file, "{}", encoded).unwrap();
     }
 }

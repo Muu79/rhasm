@@ -1,8 +1,5 @@
-pub mod assembler;
-pub mod encoder;
 use std::{ env, io };
-use assembler::Assembler;
-
+use rhasm::Assembler;
 
 fn main() -> io::Result<()> {
     let args = env::args().collect::<Vec<String>>();
@@ -12,7 +9,7 @@ fn main() -> io::Result<()> {
     };
     let out_file: &str = match args.get(2) {
         Some(filename) => &filename,
-        None => "sample.hack"
+        None => "sample.hack",
     };
     println!("Reading file {}", in_file);
 
