@@ -5,7 +5,6 @@ edition = "2021"
 authors = ["Muaaz Bhyat <"]
 description = "A Rust implementation of the hasm assembler"
 license = "MIT OR Apache-2.0"
-include = ["sample.asm"]
 
 [dependencies]
 lazy_static = "1.5.0"
