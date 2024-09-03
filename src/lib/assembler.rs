@@ -56,8 +56,9 @@ pub struct Assembler<'a> {
 }
 
 impl Assembler<'_> {
-    /// Constructor for the `Assembler` struct, returns a `Result` wrapping either the successfully constructed `Assembler` or an error.
-    /// Takes an input file and an output file reference as arguments. Returning a result with the `Assembler` instance if successful.
+    /// Constructor for the [`Assembler`] struct, returns a [`Result`] wrapping either the successfully constructed [`Assembler`] or an [`Err`].
+    /// Takes an input [`File`] and an output [`File`] reference as arguments. 
+    /// Returns a [`Result`] wrapping the built [`Assembler`] instance if successful.
     pub fn build<'a>(in_file: &'a File, out_file: &'a File) -> Result<Assembler<'a>, Box<dyn std::error::Error>> {
         // We either accept a file passed in or open the default file
         // If None is passed in, we open the sample file
@@ -199,7 +200,7 @@ impl Assembler<'_> {
         }
     }
 
-    /// Function to advance the assembler to the end of the file, encoding all instructions and writing them to the output file.
+    /// Function to advance the assembler to the end of the file, encoding all instructions and writing them all at once to the output file.
     pub fn advance_to_end(&mut self) {
         if !self.fp_flag {
             self.init();
@@ -217,10 +218,10 @@ impl Assembler<'_> {
     }
 
     /// Function to get the next encoded instruction from the assembler. 
-    /// Used internally by the advance_once and advance_to_end functions. 
+    /// Used internally by the [`Assembler::advance_once`] and [`Assembler::advance_to_end`] functions. 
     /// But can also be used to get the encoded instructions as strings rather than being written to a file.
-    /// Returns None if there are no more instructions to encode. 
-    /// Either use this function, or the advance_once and advance_to_end functions, mixing the two may result in unexpected behavior.
+    /// Returns [`None`] if there are no more instructions to encode. 
+    /// Either use this function, or the [`Assembler::advance_once`] and [`Assembler::advance_to_end`] functions, mixing the two may result in unexpected behavior.
     pub fn get_next_encoded_instruction(&mut self) -> Option<String> {
         // If we have no more instructions to encode, return None
         let instruction = if let Some(instruction) = self.instructions.get(self.cur_instruction as usize) {

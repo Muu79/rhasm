@@ -22,7 +22,7 @@
 //! ```
 //! ## As A Library
 //!
-//! To install rhasm as a  library, you can add the following to your `Cargo.toml` file:
+//! To install rhasm as a library, you can add the following to your `Cargo.toml` file:
 //!
 //! ```toml
 //! [dependencies]
