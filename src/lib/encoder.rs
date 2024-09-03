@@ -10,7 +10,8 @@ pub fn encode_instruction(
     match instruction {
         Instruction::AInstruction(addr) => {
             encoded_instruction.push('0');
-            let addr = if addr.chars().all(|char| char.is_digit(10)) {
+            let parsed_addr = 
+            if addr.chars().all(|char| char.is_digit(10)) {
                 let is_num = addr.parse::<u16>();
                 if let Ok(num) = is_num {
                     num
@@ -18,13 +19,12 @@ pub fn encode_instruction(
                     panic!("Invalid A-Instruction address or label: {}", addr);
                 }
             } else {
-                if !symbol_table.contains_key(&addr.to_string()) {
-                    symbol_table.insert(addr.to_string(), *cur_ram);
+                *symbol_table.entry(addr.to_string()).or_insert_with(|| {
                     *cur_ram += 1;
-                }
-                *symbol_table.get(&addr.to_string()).unwrap()
+                    *cur_ram - 1
+                })
             };
-            let binary_addr = format!("{:015b}", addr);
+            let binary_addr = format!("{:015b}", parsed_addr);
             encoded_instruction.extend(binary_addr.chars());
         }
         Instruction::CInstruction(dest_str, comp_str, jump_string) => {
