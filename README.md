@@ -1,6 +1,6 @@
 # RHASM (Rust Hack Assembler)
 
-This is a simple assembler for the Hack assembly language, written in Rust.
+This is a simple assembler for the Hack assembly language, written in Rust. The assembler can be used as a cli tool or as a library in your Rust project. Rhasm requires the input file to be a valid Hack assembly file, and it will output a Hack machine code file. The assembler supports all Hack assembly instructions, including A-instructions, C-instructions, and L-instructions. An example of a valid Hack assembly file is included as `sample.asm`.
 
 ## Installation
 
