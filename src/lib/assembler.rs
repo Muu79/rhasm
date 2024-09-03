@@ -25,9 +25,14 @@ r"(?x) # Ignore whitespace and allow comments
     }).unwrap();
 }
 
+/// Enum to represent the different types of instructions in the Hack Assembly Language. 
+/// Contains variants for A-Instructions and C-Instructions. 
+/// Each variant contains the necessary data to represent the instruction.
 #[derive(Clone, Debug, PartialEq)]
 pub enum Instruction {
+    /// A-Instruction variant, contains the address or symbol of the instruction.
     AInstruction(String),
+    /// C-Instruction variant, contains the destination, computation, and jump mnemonics, respectively.
     CInstruction(String, String, String),
 }
 
@@ -184,25 +189,45 @@ impl Assembler<'_> {
         self.symbol_table.insert("KBD".to_string(), 24576);
     }
 
+    /// Function to advance the assembler by one instruction, this encoded instruction is then immediately written to the output file.
     pub fn advance_once(&mut self) {
         let encoded_instruction = self.get_next_encoded_instruction();
-        self.write_line(encoded_instruction);
+        if let Some(encoded_instruction) = encoded_instruction {
+            self.write_line(encoded_instruction);
+        }
     }
 
+    /// Function to advance the assembler to the end of the file, encoding all instructions and writing them to the output file.
     pub fn advance_to_end(&mut self) {
         if !self.fp_flag {
             self.init();
         }
         let mut buffer = String::new();
         while self.cur_instruction < (self.instructions.len() as u16) {
-            buffer.push_str(&format!("{}\n", self.get_next_encoded_instruction()));
+            let instruction = if let Some(instruction) = self.get_next_encoded_instruction() {
+                instruction
+            } else {
+                break;
+            };
+            buffer.push_str(&format!("{}\n", instruction));
         }
         self.write_line(buffer);
     }
 
-    pub fn get_next_encoded_instruction(&mut self) -> String {
+    /// Function to get the next encoded instruction from the assembler. 
+    /// Used internally by the advance_once and advance_to_end functions. 
+    /// But can also be used to get the encoded instructions as strings rather than being written to a file.
+    /// Returns None if there are no more instructions to encode. 
+    /// Either use this function, or the advance_once and advance_to_end functions, mixing the two may result in unexpected behavior.
+    pub fn get_next_encoded_instruction(&mut self) -> Option<String> {
+        // If we have no more instructions to encode, return None
+        let instruction = if let Some(instruction) = self.instructions.get(self.cur_instruction as usize) {
+            instruction
+        } else {
+            return None;
+        };
         let out = encoder::encode_instruction(
-            self.instructions.get(self.cur_instruction as usize).unwrap(),
+            instruction,
             &mut self.symbol_table,
             &mut self.cur_ram
         );
@@ -210,7 +235,7 @@ impl Assembler<'_> {
         if self.cur_instruction % ((self.instructions.len() / 10) as u16) == 0 {
             println!("Encoded {} instructions", self.cur_instruction);
         }
-        out
+        Some(out)
     }
 
     fn write_line(&mut self, encoded: String) {
