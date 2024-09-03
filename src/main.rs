@@ -15,7 +15,7 @@ fn main() -> io::Result<()> {
 
     let in_file = std::fs::File::open(in_file)?;
     let out_file = std::fs::File::create(out_file)?;
-    let mut assembler = Assembler::new(Some(in_file), Some(out_file));
-    assembler.advance_to_end();
+    let assembler = Assembler::build(&in_file, &out_file);
+    assembler.unwrap().advance_to_end();
     Ok(())
 }
