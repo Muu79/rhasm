@@ -45,7 +45,11 @@ pub struct Assembler<'a> {
     pub(crate) cur_ram: u16,
     pub(crate) cur_line: usize,
     pub(crate) cur_instruction: u16,
+    /// Symbol table to store the addresses of labels and variables.
+    /// The symbol table is populated during the `build` of the `Assembler`.
     pub symbol_table: HashMap<String, u16>,
+    /// Vector of `Instruction`(s) used to store the parsed instructions from the source file.
+    /// The vector is populated on `build` and can be used in tandem with the symbol table for custom implementations.
     pub instructions: Vec<Instruction>,
     pub(crate) fp_flag: bool,
     pub(crate) instruction_regex: &'static Regex,
@@ -53,9 +57,7 @@ pub struct Assembler<'a> {
 
 impl Assembler<'_> {
     /// Constructor for the `Assembler` struct, returns a `Result` wrapping either the successfully constructed `Assembler` or an error.
-    /// Takes in two optional `File` references, one for the input file and one for the output file.
-    /// If no files are passed in, the default files `sample.asm` and `sample.hack` are used.
-    /// If the input or output file cannot be opened or created, an error is returned.
+    /// Takes an input file and an output file reference as arguments. Returning a result with the `Assembler` instance if successful.
     pub fn build<'a>(in_file: &'a File, out_file: &'a File) -> Result<Assembler<'a>, Box<dyn std::error::Error>> {
         // We either accept a file passed in or open the default file
         // If None is passed in, we open the sample file
