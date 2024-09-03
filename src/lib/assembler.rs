@@ -31,9 +31,12 @@ pub enum Instruction {
     CInstruction(String, String, String),
 }
 
-pub struct Assembler {
-    pub(crate) out_file: BufWriter<File>,
-    pub(crate) lines: Peekable<Lines<BufReader<File>>>,
+/// Struct to represent the Assembler's internal logic.
+/// Contains the file references, symbol table, and other necessary state.
+/// Can be constructed using the `build` function.
+pub struct Assembler<'a> {
+    pub(crate) out_file: BufWriter<&'a File>,
+    pub(crate) lines: Peekable<Lines<BufReader<&'a File>>>,
     pub(crate) cur_ram: u16,
     pub(crate) cur_line: usize,
     pub(crate) cur_instruction: u16,
@@ -43,42 +46,24 @@ pub struct Assembler {
     pub(crate) instruction_regex: &'static Regex,
 }
 
-impl Assembler {
-    // We take in a filename and an output file name
-    // May change to take in a BufReader and BufWriter instead
-    // Or use generics to allow for any type that implements Read and Write
-    pub fn new<'a>(in_file: Option<File>, out_file: Option<File>) -> Assembler {
+impl Assembler<'_> {
+    /// Constructor for the `Assembler` struct, returns a `Result` wrapping either the successfully constructed `Assembler` or an error.
+    /// Takes in two optional `File` references, one for the input file and one for the output file.
+    /// If no files are passed in, the default files `sample.asm` and `sample.hack` are used.
+    /// If the input or output file cannot be opened or created, an error is returned.
+    pub fn build<'a>(in_file: &'a File, out_file: &'a File) -> Result<Assembler<'a>, Box<dyn std::error::Error>> {
         // We either accept a file passed in or open the default file
         // If None is passed in, we open the sample file
         // Our file reference is then wrapped in a BufReader
-        let in_file: BufReader<File> = BufReader::new(
-            if let Some(file) = in_file {
-                file
-            } else {
-                // If we can't open the file, we panic
-                match File::open("sample.asm") {
-                    Ok(file) => file,
-                    Err(e) => panic!("Error opening file: {}", e),
-                }
-            }
-        );
+        let in_file: BufReader<&File> = BufReader::new(in_file);
 
         // We either accept a file passed in or create the default file
         // If None is passed in, we create the sample file
         // Our file reference is then wrapped in a BufWriter
-        let out_file: BufWriter<File> = BufWriter::new(
-            if let Some(file) = out_file {
-                file
-            } else {
-                match File::create("sample.hack") {
-                    Ok(file) => file,
-                    Err(e) => panic!("Error creating file: {}", e),
-                }
-            }
-        );
+        let out_file: BufWriter<&File> = BufWriter::new(out_file);
 
         // We get a peekable iterator of lines from our BufReader
-        let lines: Peekable<Lines<BufReader<File>>> = in_file.lines().peekable();
+        let lines: Peekable<Lines<BufReader<&File>>> = in_file.lines().peekable();
 
         // We initialize our symbol table as an empty HashMap
         // (Maybe we should use &str instead?)
@@ -95,7 +80,7 @@ impl Assembler {
             instruction_regex: &INSTRUCTION_REGEX,
         };
         assembler.init();
-        assembler
+        Ok(assembler)
     }
 
     // Function to initialize the assembler and its symbol table
