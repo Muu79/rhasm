@@ -79,8 +79,10 @@
 mod lib {
     pub mod assembler;
     pub mod encoder;
+    pub mod disassembler;
+    pub mod decoder;
 }
 
 // Here we declare what parts of the library are exposed to the user
 // Namely the Assembler Struct and the Instruction Enum
-pub use lib::assembler::{ Assembler, Instruction };
+pub use lib::{assembler::{ Assembler, Instruction  }, decoder::decode_instruction, disassembler::Disassembler, encoder::encode_instruction};

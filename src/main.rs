@@ -1,5 +1,5 @@
-use std::{ env, io, path::PathBuf };
-use rhasm::Assembler;
+use std::{ io, path::PathBuf };
+use rhasm::{Assembler, Disassembler};
 use clap::{ Parser, ArgAction };
 
 #[derive(Parser, Debug)]
@@ -11,12 +11,14 @@ use clap::{ Parser, ArgAction };
 )]
 struct Cli {
     /// The input file to read from
+    /// Is required and does not have an option switch
     #[arg(required = true)]
     in_file_path: PathBuf,
 
-    /// The output file to write to
+    /// The output file to write
+    /// Can be specified with the -o or --output option
     #[arg(short, long)]
-    out_file_path: Option<PathBuf>,
+    output: Option<PathBuf>,
 
     /// Disassemble the input file
     #[arg(short, long, action = ArgAction::SetTrue)]
@@ -26,20 +28,33 @@ struct Cli {
 fn main() -> io::Result<()> {
     let args = Cli::parse();
     
+    let disassemble = args.disassemble;
     let in_file = args.in_file_path;
-    let out_file = match args.out_file_path {
+    let out_file = match args.output {
         Some(filename) => filename.clone(),
         None => {
             let mut out_file = in_file.clone();
-            out_file.set_extension("hack");
+            match disassemble {
+                true => {
+                    out_file.set_extension("asm");
+                }
+                false => {
+                    out_file.set_extension("hack");
+                }
+            }
             out_file
-        },
+        }
     };
-    let dissassemble = args.disassemble;
 
     let in_file = std::fs::File::open(in_file)?;
     let out_file = std::fs::File::create(out_file)?;
-    let assembler = Assembler::build(&in_file, &out_file);
-    assembler.unwrap().advance_to_end();
+    if !disassemble {
+        let assembler = Assembler::build(&in_file, &out_file);
+        assembler.unwrap().advance_to_end();
+    }else {
+        let disassembler = Disassembler::new(&in_file, &out_file);
+        let mut disassembler = disassembler;
+        println!("{}", disassembler.advance_to_end());
+    }
     Ok(())
 }
