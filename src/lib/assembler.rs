@@ -8,7 +8,7 @@ use std::iter::Peekable;
 
 lazy_static! {
     static ref INSTRUCTION_REGEX: Regex = Regex::new({
-r"(?x) # Ignore whitespace and allow comments
+        r"(?x) # Ignore whitespace and allow comments
     ^(?:
         @(?P<a_symbol>[a-zA-Z_\.\$:][\w\.\$:]*|\d+) # A-instruction (address or symbol)
       |
@@ -25,8 +25,8 @@ r"(?x) # Ignore whitespace and allow comments
     }).unwrap();
 }
 
-/// Enum to represent the different types of instructions in the Hack Assembly Language. 
-/// Contains variants for A-Instructions and C-Instructions. 
+/// Enum to represent the different types of instructions in the Hack Assembly Language.
+/// Contains variants for A-Instructions and C-Instructions.
 /// Each variant contains the necessary data to represent the instruction.
 #[derive(Clone, Debug, PartialEq)]
 pub enum Instruction {
@@ -57,9 +57,12 @@ pub struct Assembler<'a> {
 
 impl Assembler<'_> {
     /// Constructor for the [`Assembler`] struct, returns a [`Result`] wrapping either the successfully constructed [`Assembler`] or an [`Err`].
-    /// Takes an input [`File`] and an output [`File`] reference as arguments. 
+    /// Takes an input [`File`] and an output [`File`] reference as arguments.
     /// Returns a [`Result`] wrapping the built [`Assembler`] instance if successful.
-    pub fn build<'a>(in_file: &'a File, out_file: &'a File) -> Result<Assembler<'a>, Box<dyn std::error::Error>> {
+    pub fn build<'a>(
+        in_file: &'a File,
+        out_file: &'a File
+    ) -> Result<Assembler<'a>, Box<dyn std::error::Error>> {
         // We either accept a file passed in or open the default file
         // If None is passed in, we open the sample file
         // Our file reference is then wrapped in a BufReader
@@ -214,17 +217,19 @@ impl Assembler<'_> {
             };
             buffer.push_str(&format!("{}\n", instruction));
         }
-        self.write_line(buffer);
+        self.write_line(buffer.trim_end().to_owned());
     }
 
-    /// Function to get the next encoded instruction from the assembler. 
-    /// Used internally by the [`Assembler::advance_once`] and [`Assembler::advance_to_end`] functions. 
+    /// Function to get the next encoded instruction from the assembler.
+    /// Used internally by the [`Assembler::advance_once`] and [`Assembler::advance_to_end`] functions.
     /// But can also be used to get the encoded instructions as strings rather than being written to a file.
-    /// Returns [`None`] if there are no more instructions to encode. 
+    /// Returns [`None`] if there are no more instructions to encode.
     /// Either use this function, or the [`Assembler::advance_once`] and [`Assembler::advance_to_end`] functions, mixing the two may result in unexpected behavior.
     pub fn get_next_encoded_instruction(&mut self) -> Option<String> {
         // If we have no more instructions to encode, return None
-        let instruction = if let Some(instruction) = self.instructions.get(self.cur_instruction as usize) {
+        let instruction = if
+            let Some(instruction) = self.instructions.get(self.cur_instruction as usize)
+        {
             instruction
         } else {
             return None;
@@ -242,6 +247,6 @@ impl Assembler<'_> {
     }
 
     fn write_line(&mut self, encoded: String) {
-        writeln!(self.out_file, "{}", encoded).unwrap();
+        write!(self.out_file, "{}", encoded.trim()).unwrap();
     }
 }
