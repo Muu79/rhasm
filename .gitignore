@@ -2,4 +2,5 @@
 *.svg
 perf.*
 *.hack
+*.asm
 /.vscode
