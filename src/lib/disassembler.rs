@@ -12,11 +12,24 @@ pub struct Disassembler<'a> {
     pub cur_encoded_instruction: Option<String>,
     pub cur_decoded_instruction: Option<String>,
     complete: bool,
+write_to_file: bool,
 }
 
-impl<'a> Disassembler<'a> {
-    pub fn new(in_file: &'a File, out_file: &'a File) -> Disassembler<'a> {
-        let filtered_lines: fn(&Result<String, Error>) -> bool = |line: &Result<String, Error>| line.is_ok() && !line.as_ref().unwrap().is_empty();
+pub struct DisassemblerConfig<R: Read, W: Write> {
+    pub in_file: R,
+    pub out_file: Option<W>,
+    pub write_to_file: bool,
+}
+
+/// Implementation of the Disassembler struct. Takes a generic that implements the Read trait as an input.
+impl<'a, R> Disassembler<'a, R> where R: Read {
+    /// Creates a new Disassembler instance.
+    /// Notably cannot fail given two valid files, thus is new and not build.
+    pub fn new<W>(args: DisassemblerConfig<R, W>) -> Disassembler<'a, R>
+        where &'a mut R: Read + 'a, W: Write + 'a
+    {
+        let DisassemblerConfig { in_file, out_file, write_to_file } = args;
+        let lines: fn(&Result<String, Error>) -> bool = |line: &Result<String, Error>| line.is_ok() && !line.as_ref().unwrap().is_empty();
         let lines: Peekable<Filter<Lines<BufReader<&'a File>>, fn(&Result<String, Error>) -> bool>> =
             BufReader::new(in_file)
                 .lines()
