@@ -1,5 +1,5 @@
-use std::{ io, path::PathBuf };
-use rhasm::{Assembler, Disassembler};
+use std::{ io::{ self }, path::PathBuf };
+use rhasm::{ Assembler, Disassembler };
 use clap::{ Parser, ArgAction };
 
 #[derive(Parser, Debug)]
@@ -27,13 +27,13 @@ struct Cli {
 
 fn main() -> io::Result<()> {
     let args = Cli::parse();
-    
+
     let disassemble = args.disassemble;
-    let in_file = args.in_file_path;
-    let out_file = match args.output {
+    let in_file_path = args.in_file_path;
+    let out_file_path = match args.output.as_ref() {
         Some(filename) => filename.clone(),
         None => {
-            let mut out_file = in_file.clone();
+            let mut out_file = in_file_path.clone();
             match disassemble {
                 true => {
                     out_file.set_extension("asm");
@@ -46,15 +46,40 @@ fn main() -> io::Result<()> {
         }
     };
 
-    let in_file = std::fs::File::open(in_file)?;
-    let out_file = std::fs::File::create(out_file)?;
+    let in_file = std::fs::File::open(in_file_path)?;
+
+    let out_file = match args.output.as_ref() {
+        Some(_) =>
+            Some(match std::fs::File::create_new(&out_file_path) {
+                Ok(file) => file,
+                Err(_) => {
+                    println!("File already exists, do you want to overwrite it? (y/n)");
+                    let mut response = String::new();
+                    io::stdin().read_line(&mut response).unwrap();
+                    if response.trim().to_ascii_lowercase() == "y" {
+                        std::fs::File::create(&out_file_path).unwrap()
+                    } else {
+                        return Ok(());
+                    }
+                }
+            }),
+        None => None,
+    };
+
     if !disassemble {
-        let assembler = Assembler::build(&in_file, &out_file);
+        let assembler = Assembler::build(&in_file, out_file.as_ref().unwrap());
         assembler.unwrap().advance_to_end();
-    }else {
-        let disassembler = Disassembler::new(&in_file, &out_file);
-        let mut disassembler = disassembler;
-        println!("{}", disassembler.advance_to_end());
+    } else {
+        let config = rhasm::DisassemblerConfig{
+            in_file: in_file,
+            out_file: out_file,
+            write_to_file: true,
+        };
+        let mut disassembler = Disassembler::new(config);
+        disassembler.advance_to_end();
     }
     Ok(())
+
 }
+
+

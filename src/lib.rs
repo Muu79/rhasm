@@ -3,7 +3,7 @@
 //! This project is the 6th project from their [Nand2Tetris course](https://www.nand2tetris.org/course).
 //!
 //! # Usage
-//! 
+//!
 //! rhasm can be used as both a Rust library and as a standalone binary.
 //!
 //! ## As A Binary
@@ -14,7 +14,7 @@
 //! ```bash
 //! cargo install rhasm
 //! ```
-//! 
+//!
 //! To then use the binary, you can run the following command:
 //!
 //! ```bash
@@ -48,7 +48,7 @@
 //! ```rust
 //! use rhasm::*;
 //! use std::fs::File;
-//! 
+//!
 //! let in_file = File::open("sample.asm").unwrap();
 //! let out_file = File::create("sample.hack").unwrap();
 //! let mut assembler_result = Assembler::build(&in_file, &out_file);
@@ -85,4 +85,9 @@ mod lib {
 
 // Here we declare what parts of the library are exposed to the user
 // Namely the Assembler Struct and the Instruction Enum
-pub use lib::{assembler::{ Assembler, Instruction  }, decoder::decode_instruction, disassembler::Disassembler, encoder::encode_instruction};
+pub use lib::{
+    assembler::{ Assembler, Instruction },
+    decoder::decode_instruction,
+    disassembler::{Disassembler, DisassemblerConfig},
+    encoder::encode_instruction,
+};

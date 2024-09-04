@@ -1,18 +1,19 @@
 use std::{
-    fs::File,
-    io::{BufRead as _, BufReader, BufWriter, Error, Lines, Write as _},
-    iter::{Filter, Peekable},
+    io::{ BufRead, BufReader, BufWriter, Error, Lines, Read, Write, stdout },
+    iter::{ Filter, Peekable },
 };
 use crate::decode_instruction;
 
-pub struct Disassembler<'a> {
-    out_file: BufWriter<&'a File>,
-    lines: Peekable<Filter<Lines<BufReader<&'a File>>, fn(&Result<String, Error>) -> bool>>,
-    buffer: String,
+/// Struct to disassemble a binary file into human readable instructions.
+/// The disassembler will not be able to recover labels or variables.
+/// Uses the Hack instruction set.
+pub struct Disassembler<'a, R: Read> {
+    out_file: Box<dyn Write + 'a>,
+    lines: Peekable<Filter<Lines<BufReader<R>>, fn(&Result<String, Error>) -> bool>>,
     pub cur_encoded_instruction: Option<String>,
     pub cur_decoded_instruction: Option<String>,
     complete: bool,
-write_to_file: bool,
+    write_to_file: bool,
 }
 
 pub struct DisassemblerConfig<R: Read, W: Write> {
@@ -29,20 +30,26 @@ impl<'a, R> Disassembler<'a, R> where R: Read {
         where &'a mut R: Read + 'a, W: Write + 'a
     {
         let DisassemblerConfig { in_file, out_file, write_to_file } = args;
-        let lines: fn(&Result<String, Error>) -> bool = |line: &Result<String, Error>| line.is_ok() && !line.as_ref().unwrap().is_empty();
-        let lines: Peekable<Filter<Lines<BufReader<&'a File>>, fn(&Result<String, Error>) -> bool>> =
-            BufReader::new(in_file)
-                .lines()
-                .filter(filtered_lines)
-                .peekable();
-        let out_file = BufWriter::new(out_file);
+        let line_filter: fn(&Result<String, Error>) -> bool = |line: &Result<String, Error>| {
+            line.is_ok() && !line.as_ref().unwrap().is_empty()
+        };
+
+        let lines: Peekable<
+            Filter<Lines<BufReader<R>>, fn(&Result<String, Error>) -> bool>
+        > = BufReader::new(in_file).lines().filter(line_filter).peekable();
+
+        let out_file: Box<dyn Write + 'a> = match out_file {
+            Some(file) => Box::new(BufWriter::new(file)),
+            None => Box::new(BufWriter::new(stdout())),
+        };
+
         Disassembler {
             out_file,
             lines,
-            buffer: String::new(),
             cur_encoded_instruction: None,
             cur_decoded_instruction: None,
             complete: false,
+            write_to_file,
         }
     }
 
@@ -70,12 +77,11 @@ impl<'a, R> Disassembler<'a, R> where R: Read {
                 None
             }
         };
+        if !self.write_to_file {
+            return out;
+        }
         if let Some(decoded_instruction) = out.as_ref() {
-            self.buffer.push_str(decoded_instruction);
-            self.buffer.push('\n');
-        } else {
-            self.out_file.write_all(self.buffer.as_bytes()).unwrap();
-            self.complete = true;
+            write!(self.out_file, "{}\n", decoded_instruction).unwrap();
         }
         out
     }
