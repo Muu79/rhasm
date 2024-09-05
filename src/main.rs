@@ -1,4 +1,4 @@
-use std::{ io::{ self }, path::PathBuf };
+use std::{ io::{ self, Write as _ }, path::PathBuf };
 use rhasm::{ Assembler, Disassembler };
 use clap::{ Parser, ArgAction };
 
@@ -46,14 +46,22 @@ fn main() -> io::Result<()> {
         }
     };
 
-    let in_file = std::fs::File::open(in_file_path)?;
+    let mut in_file = std::fs::File::open(in_file_path)?;
 
     let out_file = match args.output.as_ref() {
         Some(_) =>
             Some(match std::fs::File::create_new(&out_file_path) {
                 Ok(file) => file,
                 Err(_) => {
-                    println!("File already exists, do you want to overwrite it? (y/n)");
+                    print!(
+                        "File {} already exists\n\
+                        If you would like to specify an output file use:\
+                        \nrhasm <input_file_path> [-o | --output] <output_file_path>\n\n\
+                        Would you like to overwrite {} instead? (y/n): ",
+                        out_file_path.file_name().unwrap().to_str().unwrap(),
+                        out_file_path.display()
+                    );
+                    io::stdout().flush().unwrap();
                     let mut response = String::new();
                     io::stdin().read_line(&mut response).unwrap();
                     if response.trim().to_ascii_lowercase() == "y" {
@@ -66,20 +74,16 @@ fn main() -> io::Result<()> {
         None => None,
     };
 
-    if !disassemble {
+    if disassemble {
+        let args = rhasm::DisassemblerConfig {
+            in_file: &mut in_file,
+            out_file: out_file,
+        };
+        let mut disassembler = Disassembler::new(args);
+        disassembler.write_to_end();
+    } else {
         let assembler = Assembler::build(&in_file, out_file.as_ref().unwrap());
         assembler.unwrap().advance_to_end();
-    } else {
-        let config = rhasm::DisassemblerConfig{
-            in_file: in_file,
-            out_file: out_file,
-            write_to_file: true,
-        };
-        let mut disassembler = Disassembler::new(config);
-        disassembler.advance_to_end();
     }
     Ok(())
-
 }
-
-

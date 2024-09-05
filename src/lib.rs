@@ -26,7 +26,7 @@
 //!
 //! ```toml
 //! [dependencies]
-//! rhasm = "0.1.0"
+//! rhasm = "0.1.2"
 //! ```
 //!
 //! or use the following command:
@@ -41,8 +41,13 @@
 //! use rhasm::*;
 //! ```
 //!
-//! As a library rhasm exposes both the [`Assembler`] struct and the [`Instruction`] enum.
+//! As a library rhasm exposes both an [`Assembler`] and [`Disassembler`] struct that are able to read over the lines of some source file.
+//! You can then use them to either write to a file or to return the decoded instructions as a string, both line by line or all at once.
 //!
+//! # Examples
+//! 
+//! ## Assembling
+//! 
 //! By using the [`Assembler`] struct you can build an assembler instance and call the [`Assembler::advance_to_end`] method to assemble the entire bin file or use [`Assembler::advance_once`] to write to the file one line at a time.
 //!
 //! ```rust
@@ -74,8 +79,40 @@
 //! }
 //! // Do something with the buffer
 //! ```
-//!
-// Define our library structure here
+//! 
+//! ## Disassembling
+//! 
+//! By using the [`Disassembler`] struct you can build a disassembler instance and call the [`Disassembler::write_to_end`] method to disassemble the entire asm file or use [`Disassembler::write_one_line`] to write to the file one line at a time.
+//! ```rust
+//! use rhasm::*;
+//! use std::io::Cursor;
+//! // Note the use of a Cursor here to simulate a file, any Type that implements Read can be used here
+//! let mut input = Cursor::new("
+//! 0000000100000000
+//! 1110110000010000
+//! 0000000000000000
+//! 1110001100001000
+//! 0000000010000101
+//! ");
+//! let expected_output = "\
+//! @256
+//! D=A
+//! @0
+//! M=D
+//! @133
+//! ";
+//! 
+//! let args = DisassemblerConfig {
+//!    in_file: &mut input,
+//!   out_file: None::<Cursor<&mut [u8]>>,
+//! };
+//! let mut disassembler = Disassembler::new(args);
+//! let actual_output = disassembler.disassemble_to_end().unwrap();
+//! 
+//! assert_eq!(expected_output, actual_output);
+//! 
+//! 
+//Define our library structure here
 mod lib {
     pub mod assembler;
     pub mod encoder;
@@ -91,3 +128,6 @@ pub use lib::{
     disassembler::{Disassembler, DisassemblerConfig},
     encoder::encode_instruction,
 };
+
+// re-export all modules from lib.rs
+pub use lib::*;
