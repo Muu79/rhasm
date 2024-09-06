@@ -1,4 +1,4 @@
-use std::{ io::{ self, Write as _ }, path::PathBuf };
+use std::{ borrow::BorrowMut, io::{ self, Write as _ }, path::PathBuf };
 use rhasm::{ Assembler, Disassembler };
 use clap::{ Parser, ArgAction };
 
@@ -48,41 +48,36 @@ fn main() -> io::Result<()> {
 
     let mut in_file = std::fs::File::open(in_file_path)?;
 
-    let out_file = match args.output.as_ref() {
-        Some(_) =>
-            Some(match std::fs::File::create_new(&out_file_path) {
-                Ok(file) => file,
-                Err(_) => {
-                    print!(
-                        "File {} already exists\n\
-                        If you would like to specify an output file use:\
-                        \nrhasm <input_file_path> [-o | --output] <output_file_path>\n\n\
-                        Would you like to overwrite {} instead? (y/n): ",
-                        out_file_path.file_name().unwrap().to_str().unwrap(),
-                        out_file_path.display()
-                    );
-                    io::stdout().flush().unwrap();
-                    let mut response = String::new();
-                    io::stdin().read_line(&mut response).unwrap();
-                    if response.trim().to_ascii_lowercase() == "y" {
-                        std::fs::File::create(&out_file_path).unwrap()
-                    } else {
-                        return Ok(());
-                    }
-                }
-            }),
-        None => None,
-    };
+    let out_file_create_result = std::fs::File::create_new(&out_file_path);
+    let mut out_file = out_file_create_result.unwrap_or_else(|_| {
+        eprint!(
+            "Could not create output file, file {} already exists
+            Would you like to overwrite the file? (y/n)",
+            out_file_path.display()
+        );
+        io::stdout().flush().unwrap();
+        let mut input = String::new();
+        io::stdin().read_line(&mut input).unwrap();
+        if input.trim().to_lowercase() == "y" {
+            std::fs::File::create(out_file_path).unwrap()
+        } else {
+            std::process::exit(1);
+        }
+    });
+
+    let reader = &mut in_file;
+    let writer = Some(out_file.borrow_mut());
 
     if disassemble {
         let args = rhasm::DisassemblerConfig {
-            in_file: &mut in_file,
-            out_file: out_file,
+            reader,
+            writer,
         };
         let mut disassembler = Disassembler::new(args);
-        disassembler.write_to_end();
+        disassembler.write_to_end()?;
+        
     } else {
-        let assembler = Assembler::build(&in_file, out_file.as_ref().unwrap());
+        let assembler = Assembler::build(&in_file, &out_file);
         assembler.unwrap().advance_to_end();
     }
     Ok(())

@@ -247,6 +247,6 @@ impl Assembler<'_> {
     }
 
     fn write_line(&mut self, encoded: String) {
-        write!(self.out_file, "{}", encoded.trim()).unwrap();
+        write!(self.out_file, "{}\n", encoded.trim()).unwrap();
     }
 }

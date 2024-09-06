@@ -17,11 +17,11 @@ pub struct Disassembler<'a, R: Read, W: Write> {
 /// Config used to create a new Disassembler instance.
 /// Takes two generics (`R` and `W`) that implement the [`Read`] and [`Write`] traits.
 ///
-/// When [`DisassemblerConfig::writer`] is [`None`]:
+/// When the passed [`DisassemblerConfig::writer`] is [`None`]:
 /// * the disassembler will return an error when using functions that attempt to write to the output.
 pub struct DisassemblerConfig<'a, R: Read, W: Write> {
     pub reader: &'a mut R,
-    pub writer: &'a mut Option<W>,
+    pub writer: Option<&'a mut W>,
 }
 
 impl<'a, R, W> Disassembler<'a, R, W> where R: Read, W: Write {
@@ -61,7 +61,7 @@ impl<'a, R, W> Disassembler<'a, R, W> where R: Read, W: Write {
     }
 
     /// Check if [`Disassembler::lines`] has more instructions to disassemble.
-    pub fn has_next(&mut self) -> bool {
+    fn has_next(&mut self) -> bool {
         self.lines.peek().is_some()
     }
 
@@ -118,13 +118,13 @@ impl<'a, R, W> Disassembler<'a, R, W> where R: Read, W: Write {
         }
     }
 
-    /// Disassemble and write the next instruction to [`Disassembler::writer`], advancing the disassembler.
+    /// Disassemble and write the next instruction to the writer in [`DisassemblerConfig::writer`], advancing the disassembler.
     ///
     /// ### Errors
     ///
     /// * Returns an error if there are issues writing to the output file.
     /// * Returns an error if there are no more instructions to disassemble.
-    /// * Returns an error if [`Disassembler::writer`] is [`None`].
+    /// * Returns an error if the writer passed in [`DisassemblerConfig::writer`] is [`None`].
     pub fn write_next(&mut self) -> Result<(), Error> {
         let out = self.get_next();
         if out.is_some() {
@@ -135,7 +135,7 @@ impl<'a, R, W> Disassembler<'a, R, W> where R: Read, W: Write {
         }
     }
 
-    /// Disassemble and write all remaining instructions to [`Disassembler::writer`]
+    /// Disassemble and write all remaining instructions to the writer passed in [`DisassemblerConfig::writer`]
     ///
     /// * Advances the [`Disassembler`] to the end.
     ///
@@ -155,7 +155,7 @@ impl<'a, R, W> Disassembler<'a, R, W> where R: Read, W: Write {
     }
 
     /// Disassemble, write and return the next instruction.
-    /// * Writes to [`Disassembler::writer`] if it is [`Some`].
+    /// * Writes to output referenced by [`DisassemblerConfig::writer`] if it is [`Some`].
     /// ### Returns
     ///
     /// * Returns a [`Result<Option>`] wrapping the next instruction if there is one.
@@ -163,7 +163,8 @@ impl<'a, R, W> Disassembler<'a, R, W> where R: Read, W: Write {
     ///
     /// ### Errors
     ///
-    /// * Returns an error if [`Disassembler::writer`] is [`None`] or if there are issues writing to the output.
+    /// * Returns an error if the reference passed by [`DisassemblerConfig::writer`] is [`None`]
+    /// * Returns an error if there are issues writing to the output.
     pub fn get_and_write_next(&mut self) -> Result<Option<String>, Error> {
         let out = self.get_next();
         if let Some(instruction) = &out {
@@ -175,7 +176,7 @@ impl<'a, R, W> Disassembler<'a, R, W> where R: Read, W: Write {
     }
 
     /// Disassemble, write and return all remaining instructions.
-    /// * Writes to [`Disassembler::writer`] if it is [`Some`].
+    /// * Writes to [`DisassemblerConfig::writer`] if it is [`Some`].
     /// ### Returns
     ///
     /// * Returns a [`Result<Option>`] wrapping all remaining instructions if there are any.
@@ -183,7 +184,8 @@ impl<'a, R, W> Disassembler<'a, R, W> where R: Read, W: Write {
     ///
     /// ### Errors
     ///
-    /// * Returns an error if [`Disassembler::writer`] is [`None`] or if there are issues writing to the output.
+    /// * Returns an error if the reference passed by [`DisassemblerConfig::writer`] is [`None`] 
+    /// * Returns an error if there are issues writing to the output.
     pub fn get_and_write_to_end(&mut self) -> Result<Option<String>, Error> {
         let out = self.get_to_end();
         if out.is_some() {
@@ -197,7 +199,7 @@ impl<'a, R, W> Disassembler<'a, R, W> where R: Read, W: Write {
 
     fn write_to_output(&mut self, contents: &str) -> Result<(), Error> {
         if let Some(writer) = self.writer.as_mut() {
-            if let Err(error) = write!(writer, "{}", contents) {
+            if let Err(error) = write!(writer, "{}\n", contents.trim()) {
                 eprintln!("Error writing to output: {}", error);
                 return Err(error);
             }
@@ -209,6 +211,7 @@ impl<'a, R, W> Disassembler<'a, R, W> where R: Read, W: Write {
     }
 }
 
+/// Implement the [`Iterator`] trait for [`Disassembler`]. Disassembler will yield each instruction as an [`Option<String>`].
 impl<'a, R, W> Iterator for Disassembler<'a, R, W> where R: Read + 'a, W: Write + 'a {
     type Item = String;
 
