@@ -18,7 +18,7 @@
 //! To then use the binary, you can run the following command:
 //!
 //! ```bash
-//! rhasm <input_file> <output_file>
+//! rhasm <input_file> [-o | --output <output_file>] [-d | --disassemble [--with_symbols <symbol_file>]]
 //! ```
 //! ## As A Library
 //!
@@ -47,36 +47,94 @@
 //! # Examples
 //!
 //! ## Assembling
-//!
-//! By using the [`Assembler`] struct you can build an assembler instance and call the [`Assembler::advance_to_end`] method to assemble the entire bin file or use [`Assembler::advance_once`] to write to the file one line at a time.
-//!
+//! 
+//! When using the [`Assembler`] struct you can either receive the encoded instruction as a string 
+//! by using the [`Assembler::get_next_encoded_instruction`] method, or write the encoded instructions to a file using the [`Assembler::advance_to_end`] or [`Assembler::advance_once`] methods.
+//! 
+//! ### Examples
+//! 
+//! Consider the sample input and expected output below
+//! ```rust
+//! // Note the use of a Cursor here to simulate a file
+//! // Any Type that implements io::Read can be used here
+//! let sample_input = "\
+//! @256
+//! D=A
+//! @0
+//! 0;JMP
+//! ";
+//! let mut expected_output = "\
+//! 0000000100000000
+//! 1110110000010000
+//! 0000000000000000
+//! 1110101010000111
+//! ";
+//! ```
 //! ```rust
 //! use rhasm::*;
-//! use std::fs::File;
-//!
-//! let in_file = File::open("sample.asm").unwrap();
-//! let out_file = File::create("sample.hack").unwrap();
-//! let mut assembler_result = Assembler::build(&in_file, &out_file);
-//! if let Ok(mut assembler) = assembler_result {
+//! use std::io::{Cursor, Read};
+//! # // Note the use of a Cursor here to simulate a file
+//! # // Any Type that implements io::Read can be used here
+//! # let sample_input = "\
+//! # @256
+//! # D=A
+//! # @0
+//! # 0;JMP
+//! # ";
+//! # let mut expected_output = "\
+//! # 0000000100000000
+//! # 1110110000010000
+//! # 0000000000000000
+//! # 1110101010000111
+//! # ";
+//! let mut in_file = Cursor::new(sample_input);
+//! let mut out_file = Cursor::new(Vec::new());
+//! if let Ok(mut assembler) = Assembler::build(&mut in_file, &mut out_file, None) {
 //!     assembler.advance_once();
 //!     assembler.advance_to_end();
 //! }
+//! let mut actual_output = String::new();
+//! out_file.set_position(0);
+//! out_file.read_to_string(&mut actual_output).unwrap();
+//! 
+//! assert_eq!(expected_output, actual_output);
 //! ```
 //!
 //! Alternatively you can call the [`Assembler::get_next_encoded_instruction`] method to return the next encoded instruction as a string that you can use as you see fit.
 //!
 //! ```rust
 //! use rhasm::*;
-//! use std::fs::File;
-//!
-//! let in_file = File::open("sample.asm").unwrap();
-//! let out_file = File::create("sample.hack").unwrap();
-//! let mut assembler = Assembler::build(&in_file, &out_file).unwrap();
-//! let mut buffer = String::new();
-//!
-//! while let Some(encoded_instruction) = assembler.get_next_encoded_instruction() {
-//!    buffer.push_str(&encoded_instruction);
+//! use std::io::{Cursor, Read};
+//! # // Note the use of a Cursor here to simulate a file
+//! # // Any Type that implements io::Read can be used here
+//! # let sample_input = "\
+//! # @256
+//! # D=A
+//! # @0
+//! # 0;JMP
+//! # ";
+//! # let expected_output = "\
+//! # 0000000100000000
+//! # 1110110000010000
+//! # 0000000000000000
+//! # 1110101010000111
+//! # ";
+//! let mut in_file = Cursor::new(sample_input);
+//! let mut out_file = Cursor::new(Vec::new());
+//! let mut actual_output = String::new();
+//! 
+//! // The if let statement has the additional benefit of dropping the assembler 
+//! // Thus freeing the mutable borrow on our input and output
+//! if let Ok(mut assembler) = Assembler::build(&mut in_file, &mut out_file, None) {
+//!     while let Some(encoded_instruction) = assembler.get_next_encoded_instruction() {
+//!        actual_output.push_str(&encoded_instruction);
+//!        actual_output.push('\n');
+//!    }
 //! }
+//! out_file.set_position(0);
+//! out_file.read_to_string(&mut actual_output).unwrap();
+//! 
+//! assert_eq!(expected_output, actual_output);
 //! // Do something with the buffer
 //! ```
 //!
