@@ -1,12 +1,13 @@
 [package]
 name = "rhasm"
-version = "0.1.1"
+version = "0.2.0"
 edition = "2021"
-authors = ["Muaaz Bhyat <"]
+authors = ["Muaaz Bhyat"]
 description = "A Rust implementation of the hasm assembler"
 license = "MIT OR Apache-2.0"
 
 [dependencies]
+clap = { version = "4.5.16", features = ["derive"] }
 lazy_static = "1.5.0"
 regex = "1"
 
