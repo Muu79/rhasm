@@ -1,10 +1,11 @@
 use lazy_static::lazy_static;
 use crate::lib::encoder;
 use regex::Regex;
-use std::collections::HashMap;
-use std::fs::File;
-use std::io::{ BufRead, BufReader, BufWriter, Lines, Write };
-use std::iter::Peekable;
+use std::{
+    collections::HashMap,
+    io::{ BufRead, BufReader, BufWriter, Lines, Read, Write },
+    iter::Peekable,
+};
 
 lazy_static! {
     static ref INSTRUCTION_REGEX: Regex = Regex::new({
@@ -39,9 +40,9 @@ pub enum Instruction {
 /// Struct to represent the Assembler's internal logic.
 /// Contains the file references, symbol table, and other necessary state.
 /// Can be constructed using the `build` function.
-pub struct Assembler<'a> {
-    pub(crate) out_file: BufWriter<&'a File>,
-    pub(crate) lines: Peekable<Lines<BufReader<&'a File>>>,
+pub struct Assembler<'a, R, W> where R: Read, W: Write {
+    pub(crate) out_file: BufWriter<&'a mut W>,
+    pub(crate) lines: Peekable<Lines<BufReader<&'a mut R>>>,
     pub(crate) cur_ram: u16,
     pub(crate) cur_line: usize,
     pub(crate) cur_instruction: u16,
@@ -53,32 +54,41 @@ pub struct Assembler<'a> {
     pub instructions: Vec<Instruction>,
     pub(crate) fp_flag: bool,
     pub(crate) instruction_regex: &'static Regex,
+    symbol_file: Option<BufWriter<&'a mut W>>,
 }
 
-impl Assembler<'_> {
+impl<'a, R, W> Assembler<'a, R, W> where R: Read, W: Write {
     /// Constructor for the [`Assembler`] struct, returns a [`Result`] wrapping either the successfully constructed [`Assembler`] or an [`Err`].
     /// Takes an input [`File`] and an output [`File`] reference as arguments.
     /// Returns a [`Result`] wrapping the built [`Assembler`] instance if successful.
-    pub fn build<'a>(
-        in_file: &'a File,
-        out_file: &'a File
-    ) -> Result<Assembler<'a>, Box<dyn std::error::Error>> {
+    pub fn build(
+        in_file: &'a mut R,
+        out_file: &'a mut W,
+        symbol_file: Option<&'a mut W>
+    ) -> Result<Assembler<'a, R, W>, Box<dyn std::error::Error>> {
         // We either accept a file passed in or open the default file
         // If None is passed in, we open the sample file
         // Our file reference is then wrapped in a BufReader
-        let in_file: BufReader<&File> = BufReader::new(in_file);
+        let in_file: BufReader<&mut R> = BufReader::new(in_file);
 
         // We either accept a file passed in or create the default file
         // If None is passed in, we create the sample file
         // Our file reference is then wrapped in a BufWriter
-        let out_file: BufWriter<&File> = BufWriter::new(out_file);
+        let out_file: BufWriter<&mut W> = BufWriter::new(out_file);
 
         // We get a peekable iterator of lines from our BufReader
-        let lines: Peekable<Lines<BufReader<&File>>> = in_file.lines().peekable();
+        let lines: Peekable<Lines<BufReader<&mut R>>> = in_file.lines().peekable();
 
         // We initialize our symbol table as an empty HashMap
         // (Maybe we should use &str instead?)
         let symbol_table: HashMap<String, u16> = HashMap::new();
+
+        let symbol_file = if let Some(writer) = symbol_file {
+            Some(BufWriter::new(writer))
+        } else {
+            None
+        };
+
         let mut assembler = Assembler {
             out_file,
             lines,
@@ -89,6 +99,7 @@ impl Assembler<'_> {
             instructions: Vec::<Instruction>::new(),
             fp_flag: false,
             instruction_regex: &INSTRUCTION_REGEX,
+            symbol_file,
         };
         assembler.init();
         Ok(assembler)
@@ -240,13 +251,21 @@ impl Assembler<'_> {
             &mut self.cur_ram
         );
         self.cur_instruction += 1;
-        if self.cur_instruction % ((self.instructions.len() / 10) as u16) == 0 {
-            println!("Encoded {} instructions", self.cur_instruction);
+        if self.cur_instruction == (self.instructions.len() as u16) {
+            self.write_label_file();
         }
         Some(out)
     }
 
     fn write_line(&mut self, encoded: String) {
         write!(self.out_file, "{}\n", encoded.trim()).unwrap();
+    }
+
+    fn write_label_file(&mut self) {
+        for (label, address) in self.symbol_table.iter() {
+            if let Some(writer) = &mut self.symbol_file {
+                write!(writer, "{}:{}\n", label, address).unwrap();
+            }
+        }
     }
 }

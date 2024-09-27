@@ -1,4 +1,4 @@
-use std::{ borrow::BorrowMut, io::{ self, Write as _ }, path::PathBuf };
+use std::{ borrow::BorrowMut, fs::File, io::{ self, Write as _ }, path::PathBuf };
 use rhasm::{ Assembler, Disassembler };
 use clap::{ Parser, ArgAction };
 
@@ -46,7 +46,7 @@ fn main() -> io::Result<()> {
         }
     };
 
-    let mut in_file = std::fs::File::open(in_file_path)?;
+    let mut in_file = std::fs::File::open(&in_file_path)?;
 
     let out_file_create_result = std::fs::File::create_new(&out_file_path);
     let mut out_file = out_file_create_result.unwrap_or_else(|_| {
@@ -59,7 +59,7 @@ fn main() -> io::Result<()> {
         let mut input = String::new();
         io::stdin().read_line(&mut input).unwrap();
         if input.trim().to_lowercase() == "y" {
-            std::fs::File::create(out_file_path).unwrap()
+            std::fs::File::create(&out_file_path).unwrap()
         } else {
             std::process::exit(1);
         }
@@ -67,6 +67,8 @@ fn main() -> io::Result<()> {
 
     let reader = &mut in_file;
     let writer = Some(out_file.borrow_mut());
+    let mut label_file = File::create_new(in_file_path.with_extension("labels")).unwrap();
+    let label_table = Some(&mut label_file);
 
     if disassemble {
         let args = rhasm::DisassemblerConfig {
@@ -77,7 +79,7 @@ fn main() -> io::Result<()> {
         disassembler.write_to_end()?;
         
     } else {
-        let assembler = Assembler::build(&in_file, &out_file);
+        let assembler = Assembler::build(&mut in_file, &mut out_file, label_table);
         assembler.unwrap().advance_to_end();
     }
     Ok(())
