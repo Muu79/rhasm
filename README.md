@@ -45,38 +45,8 @@ Rhasm exposes two ways to assemble Hack assembly code, the first is through a bi
 To use rhasm as a cli tool, you can run the following command:
 
 ```bash
-rhasm <input_file> <output_file>
+rhasm <input_file> [-o | --output <output_file>] [-d | --disassemble [--with_symbols <symbol_file>]]
 ```
+### Library Examples
 
-### Library Example
-
-As a library, rhasm exposes an `Assembler` struct that can be used to assemble Hack assembly code.
-
-To use rhasm as a library, you can use the following code:
-
-```rust
-use rhasm;
-use std::fs::File;
-
-let in_file = File::open("path/to/input/file.asm").unwrap();
-let out_file = File::create("path/to/output/file.hack").unwrap();
-
-let asm = rhasm::Assembler::build(&in_file, &out_file);
-asm.advance_once() // encodes and immediately writes the next instruction
-asm.advance_to_end() // encodes and writes all remaining instructions
-```
-
-Alternatively, you can use the `get_next_encoded_instruction` method to get the next encoded instruction without writing it to the output file:
-
-```rust
-use rhasm;
-use std::fs::File;
-
-let in_file = File::open("path/to/input/file.asm").unwrap();
-let out_file = File::create("path/to/output/file.hack").unwrap();
-
-let mut asm = rhasm::Assembler::build(&in_file, &out_file);
-while let Some(encoded_instruction) = asm.get_next_encoded_instruction() {
-    // Do something with the encoded instruction
-}
-```
+Code examples can be found in the crate's [documentation](https://docs.rs/rhasm/0.1.2)
